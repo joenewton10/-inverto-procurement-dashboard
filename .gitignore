@@ -13,6 +13,7 @@ ted_clean.parquet
 project-for-applications/inverto-project/data/export_CAN_2023_2018.csv
 project-for-applications/inverto-project/data/ted_clean.csv
 project-for-applications/inverto-project/data/ted_clean.parquet
+!project-for-applications/inverto-project/data/ted_clean.parquet
 
 # Local outputs
 output/

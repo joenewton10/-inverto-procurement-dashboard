@@ -64,15 +64,31 @@ CPV_DIVISIONS = {
 }
 
 
-@st.cache_data
+@st.cache_resource
 def load_data():
+    needed_cols = [
+        "DT_AWARD",
+        "TYPE_OF_CONTRACT",
+        "CPV",
+        "ISO_COUNTRY_CODE",
+        "WIN_COUNTRY_CODE",
+        "AWARD_VALUE_EURO",
+        "VALUE_EURO",
+        "CAE_TYPE",
+        "MAIN_ACTIVITY",
+        "TITLE",
+        "WIN_NAME",
+        "NUMBER_OFFERS",
+        "B_CONTRACTOR_SME",
+    ]
+
     data_path = Path(__file__).parent / "data" / "ted_clean.parquet"
     remote_parquet_url = os.getenv("TED_PARQUET_URL", "").strip()
 
     if data_path.exists():
-        df = pd.read_parquet(data_path)
+        df = pd.read_parquet(data_path, columns=needed_cols)
     elif remote_parquet_url:
-        df = pd.read_parquet(remote_parquet_url)
+        df = pd.read_parquet(remote_parquet_url, columns=needed_cols)
     else:
         st.error(
             "Data file not found. Add data/ted_clean.parquet to the repo or set TED_PARQUET_URL in Streamlit app settings."
@@ -82,7 +98,24 @@ def load_data():
     df["DT_AWARD"] = pd.to_datetime(df["DT_AWARD"], errors="coerce")
     df = df[df["DT_AWARD"].dt.year.between(2018, 2023)]
     df["YEAR"] = df["DT_AWARD"].dt.year.astype(int)
-    df["CONTRACT_TYPE_LABEL"] = df["TYPE_OF_CONTRACT"].map(CONTRACT_TYPE_LABELS).fillna("Other")
+
+    # Reduce memory footprint for repeated values used in filters/plots.
+    for col in [
+        "TYPE_OF_CONTRACT",
+        "ISO_COUNTRY_CODE",
+        "WIN_COUNTRY_CODE",
+        "CAE_TYPE",
+        "MAIN_ACTIVITY",
+        "B_CONTRACTOR_SME",
+    ]:
+        df[col] = df[col].astype("category")
+
+    df["AWARD_VALUE_EURO"] = pd.to_numeric(df["AWARD_VALUE_EURO"], errors="coerce")
+    df["NUMBER_OFFERS"] = pd.to_numeric(df["NUMBER_OFFERS"], errors="coerce")
+
+    df["CONTRACT_TYPE_LABEL"] = (
+        df["TYPE_OF_CONTRACT"].astype("string").map(CONTRACT_TYPE_LABELS).fillna("Other")
+    )
     df["CPV_STR"] = df["CPV"].astype(str).str.zfill(8)
     df["CPV_DIV"] = df["CPV_STR"].str[:2]
     df["CPV_LABEL"] = df["CPV_DIV"].map(CPV_DIVISIONS).fillna("Other")
@@ -123,6 +156,9 @@ filtered = df[mask]
 # ── Header ────────────────────────────────────────────────────────────────────
 st.title("EU Public Procurement Benchmark Dashboard")
 st.caption("Source: TED (Tenders Electronic Daily) — Contract Award Notices 2018–2023")
+st.markdown(
+    "This dashboard benchmarks EU public procurement activity across countries, contract types, and categories to highlight spending patterns, competition levels, and supplier outcomes."
+)
 
 if filtered.empty:
     st.warning("No data matches the current filters.")
